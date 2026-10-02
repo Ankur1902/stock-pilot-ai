@@ -70,7 +70,7 @@ function errMsg(e: unknown) {
 export function useSaveProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...input }: ProductInput & { id?: string }) => {
+    mutationFn: async ({ id, ...input }: Omit<ProductInput, "id"> & { id?: string | undefined }) => {
       const { error } = id
         ? await supabase.from("products").update(input).eq("id", id)
         : await supabase.from("products").insert(input);
@@ -102,7 +102,7 @@ export function useDeleteRow(table: "products" | "suppliers") {
 export function useSaveSupplier() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...input }: SupplierInput & { id?: string }) => {
+    mutationFn: async ({ id, ...input }: Omit<SupplierInput, "id"> & { id?: string | undefined }) => {
       const { error } = id
         ? await supabase.from("suppliers").update(input).eq("id", id)
         : await supabase.from("suppliers").insert(input);
