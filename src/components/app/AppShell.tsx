@@ -120,7 +120,12 @@ export function AppShell({
 
       <Dialog open={editName} onOpenChange={setEditName}>
         <DialogContent className="rounded-2xl sm:max-w-sm">
-          <DialogHeader><DialogTitle>Your name</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Your name</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{email}</span>
+            </p>
+          </DialogHeader>
           <form onSubmit={saveName} className="space-y-4">
             <Input autoFocus maxLength={80} placeholder="e.g. Ankur Singh" value={draft} onChange={(e) => setDraft(e.target.value)} />
             <DialogFooter>
