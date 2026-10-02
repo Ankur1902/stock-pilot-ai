@@ -1,9 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X } from "lucide-react";
+import { toast } from "sonner";
+import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -13,7 +17,15 @@ const nav = [
   { to: "/insights", label: "AI Insights", icon: Sparkles },
 ] as const;
 
-export function AppShell({ email, children }: { email: string; children: ReactNode }) {
+export function AppShell({
+  email,
+  initialName,
+  children,
+}: {
+  email: string;
+  initialName: string;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();

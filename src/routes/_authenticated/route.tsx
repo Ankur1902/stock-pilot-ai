@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
 function Layout() {
   const { user } = Route.useRouteContext();
   return (
-    <AppShell email={user.email ?? ""}>
+    <AppShell email={user.email ?? ""} initialName={String(user.user_metadata?.["full_name"] ?? "")}>
       <Outlet />
     </AppShell>
   );
