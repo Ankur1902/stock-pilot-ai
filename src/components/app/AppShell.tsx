@@ -1,9 +1,13 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X } from "lucide-react";
+import { toast } from "sonner";
+import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
@@ -13,10 +17,39 @@ const nav = [
   { to: "/insights", label: "AI Insights", icon: Sparkles },
 ] as const;
 
-export function AppShell({ email, children }: { email: string; children: ReactNode }) {
+export function AppShell({
+  email,
+  initialName,
+  children,
+}: {
+  email: string;
+  initialName: string;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [name, setName] = useState(initialName);
+  const [editName, setEditName] = useState(false);
+  const [draft, setDraft] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  const initials =
+    (name || email).split(/[\s@]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+
+  const saveName = async (e: FormEvent) => {
+    e.preventDefault();
+    const clean = draft.trim().slice(0, 80);
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ data: { full_name: clean } });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setName(clean);
+    setEditName(false);
+    toast.success("Name saved");
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -48,8 +81,18 @@ export function AppShell({ email, children }: { email: string; children: ReactNo
         ))}
       </nav>
       <div className="mx-3 mb-4 mt-auto rounded-2xl glass p-4">
-        <div className="eyebrow">Signed in</div>
-        <div className="mt-1 truncate text-sm font-semibold">{email}</div>
+        <div className="flex items-center gap-3">
+          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-brand text-xs font-bold text-primary-foreground">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{name || "Add your name"}</div>
+            <div className="truncate text-xs text-muted-foreground">{email}</div>
+          </div>
+          <button onClick={() => setEditName(true)} className="text-muted-foreground hover:text-primary" aria-label="Edit name">
+            <Pencil className="size-3.5" />
+          </button>
+        </div>
         <button
           onClick={signOut}
           className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
@@ -61,15 +104,31 @@ export function AppShell({ email, children }: { email: string; children: ReactNo
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none fixed -left-24 -top-40 size-[560px] rounded-full bg-primary/25 blur-[130px]" />
-      <div className="pointer-events-none fixed right-0 top-1/3 size-[520px] rounded-full bg-brand-2/25 blur-[130px]" />
-      <div className="pointer-events-none fixed bottom-0 left-1/3 size-[480px] rounded-full bg-accent blur-[120px]" />
+    <div className="relative min-h-screen bg-background text-foreground">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-24 -top-40 size-[560px] rounded-full bg-primary/25 blur-[130px]" />
+        <div className="absolute right-0 top-1/3 size-[520px] rounded-full bg-brand-2/25 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/3 size-[480px] rounded-full bg-accent blur-[120px]" />
+      </div>
+
+      <Dialog open={editName} onOpenChange={setEditName}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader><DialogTitle>Your name</DialogTitle></DialogHeader>
+          <form onSubmit={saveName} className="space-y-4">
+            <Input autoFocus maxLength={80} placeholder="e.g. Ankur Singh" value={draft} onChange={(e) => setDraft(e.target.value)} />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setEditName(false)}>Cancel</Button>
+              <Button type="submit" variant="brand" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="relative flex min-h-screen">
-        <aside className="sticky top-0 hidden h-screen w-[248px] shrink-0 border-r border-sidebar-border bg-sidebar backdrop-blur-xl lg:block">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-sidebar-border bg-sidebar backdrop-blur-xl lg:block">
           {sidebar}
         </aside>
+        <div className="hidden w-[248px] shrink-0 lg:block" />
 
         {open && (
           <div className="fixed inset-0 z-40 lg:hidden">
