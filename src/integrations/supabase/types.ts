@@ -14,13 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      products: {
+        Row: {
+          category: string | null
+          cost_price: number
+          created_at: string
+          current_stock: number
+          id: string
+          min_stock: number
+          name: string
+          selling_price: number
+          sku: string
+          supplier_id: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          cost_price?: number
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock?: number
+          name: string
+          selling_price?: number
+          sku: string
+          supplier_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          category?: string | null
+          cost_price?: number
+          created_at?: string
+          current_stock?: number
+          id?: string
+          min_stock?: number
+          name?: string
+          selling_price?: number
+          sku?: string
+          supplier_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          id: string
+          movement_date: string
+          note: string | null
+          product_id: string
+          quantity: number
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          movement_date?: string
+          note?: string | null
+          product_id: string
+          quantity: number
+          type: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          movement_date?: string
+          note?: string | null
+          product_id?: string
+          quantity?: number
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          user_id?: string
+        }
+        Update: {
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      record_stock_movement: {
+        Args: {
+          _date: string
+          _note: string
+          _product_id: string
+          _quantity: number
+          _type: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
