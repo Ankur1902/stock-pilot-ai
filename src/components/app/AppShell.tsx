@@ -87,9 +87,16 @@ export function AppShell({
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{name || "Add your name"}</div>
-            <div className="truncate text-xs text-muted-foreground">{email}</div>
+            {!name && <div className="truncate text-xs text-muted-foreground">{email}</div>}
           </div>
-          <button onClick={() => setEditName(true)} className="text-muted-foreground hover:text-primary" aria-label="Edit name">
+          <button
+            onClick={() => {
+              setDraft(name);
+              setEditName(true);
+            }}
+            className="text-muted-foreground hover:text-primary"
+            aria-label="Edit name"
+          >
             <Pencil className="size-3.5" />
           </button>
         </div>
@@ -113,7 +120,12 @@ export function AppShell({
 
       <Dialog open={editName} onOpenChange={setEditName}>
         <DialogContent className="rounded-2xl sm:max-w-sm">
-          <DialogHeader><DialogTitle>Your name</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Your name</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Signed in as <span className="font-medium text-foreground">{email}</span>
+            </p>
+          </DialogHeader>
           <form onSubmit={saveName} className="space-y-4">
             <Input autoFocus maxLength={80} placeholder="e.g. Ankur Singh" value={draft} onChange={(e) => setDraft(e.target.value)} />
             <DialogFooter>
