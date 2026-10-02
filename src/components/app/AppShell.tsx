@@ -87,9 +87,16 @@ export function AppShell({
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">{name || "Add your name"}</div>
-            <div className="truncate text-xs text-muted-foreground">{email}</div>
+            {!name && <div className="truncate text-xs text-muted-foreground">{email}</div>}
           </div>
-          <button onClick={() => setEditName(true)} className="text-muted-foreground hover:text-primary" aria-label="Edit name">
+          <button
+            onClick={() => {
+              setDraft(name);
+              setEditName(true);
+            }}
+            className="text-muted-foreground hover:text-primary"
+            aria-label="Edit name"
+          >
             <Pencil className="size-3.5" />
           </button>
         </div>
