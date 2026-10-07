@@ -2,19 +2,23 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X, Pencil } from "lucide-react";
+import { LayoutGrid, Package, ArrowLeftRight, Truck, Sparkles, LogOut, Menu, X, Pencil, ClipboardList, BarChart3, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { NotificationBell } from "@/components/app/NotificationBell";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
   { to: "/products", label: "Products", icon: Package },
   { to: "/movements", label: "Stock Movements", icon: ArrowLeftRight },
+  { to: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
   { to: "/suppliers", label: "Suppliers", icon: Truck },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/insights", label: "AI Insights", icon: Sparkles },
+  { to: "/assistant", label: "Ask Pilot", icon: MessageCircle },
 ] as const;
 
 export function AppShell({
@@ -155,11 +159,12 @@ export function AppShell({
         )}
 
         <main className="min-w-0 flex-1 p-4 sm:p-7">
-          <div className="mb-4 flex items-center gap-3 lg:hidden">
-            <button className="glass grid size-10 place-items-center rounded-xl" onClick={() => setOpen(true)} aria-label="Open menu">
+          <div className="mx-auto mb-4 flex max-w-7xl items-center gap-3">
+            <button className="glass grid size-10 place-items-center rounded-xl lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
               <Menu className="size-5" />
             </button>
-            <span className="font-extrabold tracking-tight">StockPilot</span>
+            <span className="font-extrabold tracking-tight lg:hidden">StockPilot</span>
+            <div className="ml-auto"><NotificationBell /></div>
           </div>
           <div className={cn("mx-auto max-w-7xl")}>{children}</div>
         </main>
