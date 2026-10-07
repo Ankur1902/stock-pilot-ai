@@ -1,8 +1,15 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Download, Pencil, Plus, Search, Trash2, Upload, Wand2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { extractProduct } from "@/lib/ai.functions";
+import { downloadCsv, parseCsv } from "@/lib/extras";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +31,9 @@ export const Route = createFileRoute("/_authenticated/products")({
 
 function ProductsPage() {
   const { data, isLoading, error } = useProducts();
+  const suppliers = useSuppliers();
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
   const del = useDeleteRow("products");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
@@ -41,12 +51,50 @@ function ProductsPage() {
     return true;
   });
 
+  const exportCsv = () =>
+    downloadCsv(`products-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ["name", "sku", "category", "supplier", "cost_price", "selling_price", "current_stock", "min_stock"],
+      ...(data ?? []).map((p) => [p.name, p.sku, p.category, p.suppliers?.name, p.cost_price, p.selling_price, p.current_stock, p.min_stock]),
+    ]);
+
+  const importCsv = async (file: File) => {
+    const rows = parseCsv(await file.text());
+    const head = (rows.shift() ?? []).map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
+    const col = (r: string[], k: string) => (head.indexOf(k) >= 0 ? (r[head.indexOf(k)] ?? "").trim() : "");
+    if (!head.includes("name") || !head.includes("sku")) return toast.error("CSV needs at least 'name' and 'sku' columns.");
+    const sup = suppliers.data ?? [];
+    const items = rows
+      .filter((r) => col(r, "name") && col(r, "sku"))
+      .map((r) => ({
+        name: col(r, "name").slice(0, 200),
+        sku: col(r, "sku").slice(0, 80),
+        category: col(r, "category") || null,
+        supplier_id: sup.find((s) => s.name.toLowerCase() === col(r, "supplier").toLowerCase())?.id ?? null,
+        cost_price: Math.max(0, Number(col(r, "cost_price")) || 0),
+        selling_price: Math.max(0, Number(col(r, "selling_price")) || 0),
+        current_stock: Math.max(0, Math.floor(Number(col(r, "current_stock")) || 0)),
+        min_stock: Math.max(0, Math.floor(Number(col(r, "min_stock")) || 0)),
+      }));
+    if (!items.length) return toast.error("No valid rows found.");
+    const { error } = await supabase.from("products").upsert(items, { onConflict: "user_id,sku", ignoreDuplicates: true });
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries();
+    toast.success(`Imported ${items.length} rows (existing SKUs skipped)`);
+  };
+
   return (
     <>
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        action={<Button variant="brand" onClick={() => setEditing("new")}><Plus /> Add product</Button>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = ""; }} />
+            <Button variant="glass" onClick={() => fileRef.current?.click()}><Upload /> Import CSV</Button>
+            <Button variant="glass" onClick={exportCsv} disabled={!data?.length}><Download /> Export</Button>
+            <Button variant="brand" onClick={() => setEditing("new")}><Plus /> Add product</Button>
+          </div>
+        }
       />
       <GlassCard className="overflow-hidden">
         <div className="flex flex-col gap-3 p-5 sm:flex-row">
