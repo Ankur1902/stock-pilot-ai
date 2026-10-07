@@ -105,7 +105,7 @@ function ReportsPage() {
           <div className="mb-3 font-bold">Inventory value by category</div>
           {r.cats.length === 0 ? <EmptyState title="No products" text="Add products to see value breakdown." /> : (
             <div className="flex h-64 items-center gap-4">
-              <ResponsiveContainer width="55%">
+              <ResponsiveContainer width="55%" height="100%">
                 <PieChart>
                   <Pie data={r.cats} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
                     {r.cats.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

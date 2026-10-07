@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertTriangle, PackageCheck, RefreshCcw, Sparkles } from "lucide-react";
-import type { ReactNode } from "react";
+import { AlertTriangle, Mail, PackageCheck, RefreshCcw, Sparkles } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { GlassCard, PageHeader, EmptyState, ErrorState, LoadingRows } from "@/components/app/ui-bits";
+import { AiBriefing } from "@/components/app/AiBriefing";
+import { EmailDraftDialog } from "@/components/app/EmailDraftDialog";
+import { Button } from "@/components/ui/button";
 import { money, num, useMovements, useProducts, type Product } from "@/lib/inventory";
 
 export const Route = createFileRoute("/_authenticated/insights")({
@@ -21,6 +24,7 @@ type Insight = { product: Product; text: string };
 function InsightsPage() {
   const products = useProducts();
   const movements = useMovements();
+  const [email, setEmail] = useState<{ id: string; name: string; items: { productId: string; quantity: number }[] } | null>(null);
 
   if (products.isLoading || movements.isLoading)
     return (<><PageHeader eyebrow="Assistant" title="AI Insights" /><GlassCard><LoadingRows /></GlassCard></>);
@@ -68,9 +72,29 @@ function InsightsPage() {
       };
     });
 
+  const bySupplier = new Map<string, { name: string; items: { productId: string; quantity: number }[] }>();
+  for (const { product: p } of low) {
+    if (!p.supplier_id) continue;
+    const g = bySupplier.get(p.supplier_id) ?? { name: p.suppliers?.name ?? "Supplier", items: [] };
+    g.items.push({ productId: p.id, quantity: Math.max(p.min_stock * 2 - p.current_stock, 1) });
+    bySupplier.set(p.supplier_id, g);
+  }
+
   return (
     <>
       <PageHeader eyebrow="Assistant" title="AI Insights" />
+      <AiBriefing />
+      {bySupplier.size > 0 && (
+        <GlassCard className="mb-6 flex flex-wrap items-center gap-2 p-4">
+          <span className="mr-2 text-sm font-semibold">Draft a reorder email:</span>
+          {[...bySupplier.entries()].map(([id, g]) => (
+            <Button key={id} size="sm" variant="outline" onClick={() => setEmail({ id, ...g })}>
+              <Mail /> {g.name} ({g.items.length})
+            </Button>
+          ))}
+        </GlassCard>
+      )}
+      {email && <EmailDraftDialog supplierId={email.id} supplierName={email.name} items={email.items} onClose={() => setEmail(null)} />}
       <GlassCard className="mb-6 flex items-start gap-4 p-5">
         <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-brand text-primary-foreground shadow-brand"><Sparkles className="size-5" /></div>
         <p className="text-sm leading-relaxed">

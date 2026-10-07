@@ -1,8 +1,15 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Download, Pencil, Plus, Search, Trash2, Upload, Wand2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { extractProduct } from "@/lib/ai.functions";
+import { downloadCsv, parseCsv } from "@/lib/extras";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +31,9 @@ export const Route = createFileRoute("/_authenticated/products")({
 
 function ProductsPage() {
   const { data, isLoading, error } = useProducts();
+  const suppliers = useSuppliers();
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
   const del = useDeleteRow("products");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
@@ -41,12 +51,50 @@ function ProductsPage() {
     return true;
   });
 
+  const exportCsv = () =>
+    downloadCsv(`products-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ["name", "sku", "category", "supplier", "cost_price", "selling_price", "current_stock", "min_stock"],
+      ...(data ?? []).map((p) => [p.name, p.sku, p.category, p.suppliers?.name, p.cost_price, p.selling_price, p.current_stock, p.min_stock]),
+    ]);
+
+  const importCsv = async (file: File) => {
+    const rows = parseCsv(await file.text());
+    const head = (rows.shift() ?? []).map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
+    const col = (r: string[], k: string) => (head.indexOf(k) >= 0 ? (r[head.indexOf(k)] ?? "").trim() : "");
+    if (!head.includes("name") || !head.includes("sku")) { toast.error("CSV needs at least 'name' and 'sku' columns."); return; }
+    const sup = suppliers.data ?? [];
+    const items = rows
+      .filter((r) => col(r, "name") && col(r, "sku"))
+      .map((r) => ({
+        name: col(r, "name").slice(0, 200),
+        sku: col(r, "sku").slice(0, 80),
+        category: col(r, "category") || null,
+        supplier_id: sup.find((s) => s.name.toLowerCase() === col(r, "supplier").toLowerCase())?.id ?? null,
+        cost_price: Math.max(0, Number(col(r, "cost_price")) || 0),
+        selling_price: Math.max(0, Number(col(r, "selling_price")) || 0),
+        current_stock: Math.max(0, Math.floor(Number(col(r, "current_stock")) || 0)),
+        min_stock: Math.max(0, Math.floor(Number(col(r, "min_stock")) || 0)),
+      }));
+    if (!items.length) { toast.error("No valid rows found."); return; }
+    const { error } = await supabase.from("products").upsert(items, { onConflict: "user_id,sku", ignoreDuplicates: true });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries();
+    toast.success(`Imported ${items.length} rows (existing SKUs skipped)`);
+  };
+
   return (
     <>
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        action={<Button variant="brand" onClick={() => setEditing("new")}><Plus /> Add product</Button>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = ""; }} />
+            <Button variant="glass" onClick={() => fileRef.current?.click()}><Upload /> Import CSV</Button>
+            <Button variant="glass" onClick={exportCsv} disabled={!data?.length}><Download /> Export</Button>
+            <Button variant="brand" onClick={() => setEditing("new")}><Plus /> Add product</Button>
+          </div>
+        }
       />
       <GlassCard className="overflow-hidden">
         <div className="flex flex-col gap-3 p-5 sm:flex-row">
@@ -138,6 +186,9 @@ function ProductsPage() {
 function ProductDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const save = useSaveProduct();
   const suppliers = useSuppliers();
+  const extract = useServerFn(extractProduct);
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const [f, setF] = useState({
     name: product?.name ?? "",
     sku: product?.sku ?? "",
@@ -168,10 +219,40 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     );
   };
 
+  const fillWithAi = async () => {
+    if (aiText.trim().length < 3) return;
+    setAiBusy(true);
+    const r = await extract({ data: { text: aiText } }).catch((e: Error) => ({ ok: false as const, error: e.message }));
+    setAiBusy(false);
+    if (!r.ok) { toast.error(r.error); return; }
+    const d = r.data;
+    const sup = suppliers.data?.find((s) => d.supplier_name && s.name.toLowerCase() === d.supplier_name.toLowerCase());
+    setF((prev) => ({
+      name: d.name || prev.name,
+      sku: d.sku || prev.sku,
+      category: d.category ?? prev.category,
+      supplier_id: sup?.id ?? prev.supplier_id,
+      cost_price: d.cost_price != null ? String(d.cost_price) : prev.cost_price,
+      selling_price: d.selling_price != null ? String(d.selling_price) : prev.selling_price,
+      current_stock: d.current_stock != null ? String(Math.max(0, Math.floor(d.current_stock))) : prev.current_stock,
+      min_stock: d.min_stock != null ? String(Math.max(0, Math.floor(d.min_stock))) : prev.min_stock,
+    }));
+    toast.success("Filled in — review and save");
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="rounded-2xl sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader><DialogTitle>{product ? "Edit product" : "Add product"}</DialogTitle></DialogHeader>
+        {!product && (
+          <div className="space-y-2 rounded-xl bg-accent/60 p-3">
+            <Label className="flex items-center gap-1.5"><Wand2 className="size-3.5" /> Smart entry</Label>
+            <Textarea rows={3} value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="Paste a description or invoice line, e.g. “50 ceramic mugs 350ml from Clay & Kiln, cost $3.20, sell $9, reorder at 15”" className="bg-card" />
+            <Button type="button" size="sm" variant="brand" onClick={fillWithAi} disabled={aiBusy || aiText.trim().length < 3}>
+              <Wand2 /> {aiBusy ? "Reading…" : "Fill form with AI"}
+            </Button>
+          </div>
+        )}
         <form onSubmit={submit} className="grid grid-cols-2 gap-4">
           <Field label="Product name" className="col-span-2"><Input required value={f.name} onChange={set("name")} /></Field>
           <Field label="SKU"><Input required value={f.sku} onChange={set("sku")} /></Field>
