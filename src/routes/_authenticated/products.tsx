@@ -186,6 +186,9 @@ function ProductsPage() {
 function ProductDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const save = useSaveProduct();
   const suppliers = useSuppliers();
+  const extract = useServerFn(extractProduct);
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const [f, setF] = useState({
     name: product?.name ?? "",
     sku: product?.sku ?? "",
@@ -216,10 +219,40 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     );
   };
 
+  const fillWithAi = async () => {
+    if (aiText.trim().length < 3) return;
+    setAiBusy(true);
+    const r = await extract({ data: { text: aiText } }).catch((e: Error) => ({ ok: false as const, error: e.message }));
+    setAiBusy(false);
+    if (!r.ok) return toast.error(r.error);
+    const d = r.data;
+    const sup = suppliers.data?.find((s) => d.supplier_name && s.name.toLowerCase() === d.supplier_name.toLowerCase());
+    setF((prev) => ({
+      name: d.name || prev.name,
+      sku: d.sku || prev.sku,
+      category: d.category ?? prev.category,
+      supplier_id: sup?.id ?? prev.supplier_id,
+      cost_price: d.cost_price != null ? String(d.cost_price) : prev.cost_price,
+      selling_price: d.selling_price != null ? String(d.selling_price) : prev.selling_price,
+      current_stock: d.current_stock != null ? String(Math.max(0, Math.floor(d.current_stock))) : prev.current_stock,
+      min_stock: d.min_stock != null ? String(Math.max(0, Math.floor(d.min_stock))) : prev.min_stock,
+    }));
+    toast.success("Filled in — review and save");
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="rounded-2xl sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
         <DialogHeader><DialogTitle>{product ? "Edit product" : "Add product"}</DialogTitle></DialogHeader>
+        {!product && (
+          <div className="space-y-2 rounded-xl bg-accent/60 p-3">
+            <Label className="flex items-center gap-1.5"><Wand2 className="size-3.5" /> Smart entry</Label>
+            <Textarea rows={3} value={aiText} onChange={(e) => setAiText(e.target.value)} placeholder="Paste a description or invoice line, e.g. “50 ceramic mugs 350ml from Clay & Kiln, cost $3.20, sell $9, reorder at 15”" className="bg-card" />
+            <Button type="button" size="sm" variant="brand" onClick={fillWithAi} disabled={aiBusy || aiText.trim().length < 3}>
+              <Wand2 /> {aiBusy ? "Reading…" : "Fill form with AI"}
+            </Button>
+          </div>
+        )}
         <form onSubmit={submit} className="grid grid-cols-2 gap-4">
           <Field label="Product name" className="col-span-2"><Input required value={f.name} onChange={set("name")} /></Field>
           <Field label="SKU"><Input required value={f.sku} onChange={set("sku")} /></Field>
