@@ -61,7 +61,7 @@ function ProductsPage() {
     const rows = parseCsv(await file.text());
     const head = (rows.shift() ?? []).map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
     const col = (r: string[], k: string) => (head.indexOf(k) >= 0 ? (r[head.indexOf(k)] ?? "").trim() : "");
-    if (!head.includes("name") || !head.includes("sku")) return toast.error("CSV needs at least 'name' and 'sku' columns.");
+    if (!head.includes("name") || !head.includes("sku")) { toast.error("CSV needs at least 'name' and 'sku' columns."); return; }
     const sup = suppliers.data ?? [];
     const items = rows
       .filter((r) => col(r, "name") && col(r, "sku"))
@@ -75,9 +75,9 @@ function ProductsPage() {
         current_stock: Math.max(0, Math.floor(Number(col(r, "current_stock")) || 0)),
         min_stock: Math.max(0, Math.floor(Number(col(r, "min_stock")) || 0)),
       }));
-    if (!items.length) return toast.error("No valid rows found.");
+    if (!items.length) { toast.error("No valid rows found."); return; }
     const { error } = await supabase.from("products").upsert(items, { onConflict: "user_id,sku", ignoreDuplicates: true });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     qc.invalidateQueries();
     toast.success(`Imported ${items.length} rows (existing SKUs skipped)`);
   };
@@ -224,7 +224,7 @@ function ProductDialog({ product, onClose }: { product: Product | null; onClose:
     setAiBusy(true);
     const r = await extract({ data: { text: aiText } }).catch((e: Error) => ({ ok: false as const, error: e.message }));
     setAiBusy(false);
-    if (!r.ok) return toast.error(r.error);
+    if (!r.ok) { toast.error(r.error); return; }
     const d = r.data;
     const sup = suppliers.data?.find((s) => d.supplier_name && s.name.toLowerCase() === d.supplier_name.toLowerCase());
     setF((prev) => ({

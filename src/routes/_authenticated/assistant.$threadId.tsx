@@ -53,14 +53,14 @@ function AssistantPage() {
 
   const newThread = async () => {
     const { data, error } = await supabase.from("chat_threads").insert({}).select("id").single();
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await qc.invalidateQueries({ queryKey: ["threads"] });
     navigate({ to: "/assistant/$threadId", params: { threadId: data.id } });
   };
 
   const deleteThread = async (id: string) => {
     const { error } = await supabase.from("chat_threads").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await qc.invalidateQueries({ queryKey: ["threads"] });
     if (id === threadId) navigate({ to: "/assistant" });
   };
