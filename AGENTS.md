@@ -14,3 +14,4 @@
 - Chat history is threaded and stored per user in `chat_threads`/`chat_messages` (AI SDK UIMessage JSON keyed by message id) so it syncs across devices.
 - Receiving a purchase order goes through the `receive_purchase_order` RPC, which reuses `record_stock_movement` so stock changes stay atomic.
 - Low-stock alerts are created by a database trigger on `products` so every stock path (manual, movement, PO, import) triggers them.
+- Auth guard reads the local session (getSession) and QueryClient caches 60s with hover preloading, so tab switches are instant; RLS remains the real access check.
