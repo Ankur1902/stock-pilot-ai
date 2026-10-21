@@ -5,9 +5,11 @@ import { AppShell } from "@/components/app/AppShell";
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+    // Local session read (no network round-trip on every tab switch); RLS still enforces access server-side.
+    const { data } = await supabase.auth.getSession();
+    const user = data.session?.user;
+    if (!user) throw redirect({ to: "/auth" });
+    return { user };
   },
   component: Layout,
 });
